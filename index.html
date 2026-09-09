@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+<meta name="googlebot" content="noindex, nofollow">
+<title>Private</title>
+<style>
+  html,body{margin:0;height:100%;background:#05070E;color:#8B93A8;
+    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;}
+  .box{height:100%;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:14px;text-align:center;padding:24px;}
+  .box p{margin:0;font-size:13px;letter-spacing:.14em;}
+  .box .sm{font-size:11px;color:#4A5265;letter-spacing:.1em;line-height:1.9;}
+  iframe{position:fixed;inset:0;width:100%;height:100%;border:0;background:#05070E;}
+</style>
+</head>
+<body>
+<div class="box" id="msg">
+  <p>PRIVATE</p>
+  <p class="sm">opening…</p>
+</div>
+<script>
+(function(){
+  var IV = "f58fdaf3a97ae86712f511b6567f06a9";
+  var msg = document.getElementById('msg');
+  function fail(text){
+    msg.innerHTML = '<p>PRIVATE</p><p class="sm">' + text + '</p>';
+  }
+  function b2u(s){
+    s = s.replace(/-/g,'+').replace(/_/g,'/');
+    while(s.length % 4) s += '=';
+    var bin = atob(s), a = new Uint8Array(bin.length);
+    for(var i=0;i<bin.length;i++) a[i] = bin.charCodeAt(i);
+    return a;
+  }
+  var frag = (location.hash || '').replace(/^#/,'').trim();
+  if(!frag){ fail('このページは非公開です。'); return; }
+  if(!(window.crypto && window.crypto.subtle)){
+    fail('この環境では表示できません。'); return;
+  }
+  var rawKey;
+  try{ rawKey = b2u(frag); }catch(e){ fail('鍵が正しくありません。'); return; }
+  if(rawKey.length !== 32){ fail('鍵が正しくありません。'); return; }
+
+  var iv = new Uint8Array(IV.match(/../g).map(function(h){ return parseInt(h,16); }));
+
+  Promise.all([
+    crypto.subtle.importKey('raw', rawKey, {name:'AES-CBC'}, false, ['decrypt']),
+    fetch('c.txt', {cache:'no-store'}).then(function(r){
+      if(!r.ok) throw new Error('fetch');
+      return r.text();
+    })
+  ]).then(function(res){
+    var key = res[0];
+    var data = b2u(res[1].replace(/\s/g,''));
+    return crypto.subtle.decrypt({name:'AES-CBC', iv:iv}, key, data);
+  }).then(function(buf){
+    var html = new TextDecoder('utf-8').decode(buf);
+    var url = URL.createObjectURL(new Blob([html], {type:'text/html'}));
+    var f = document.createElement('iframe');
+    f.setAttribute('allow','autoplay');
+    f.src = url;
+    document.body.innerHTML = '';
+    document.body.appendChild(f);
+  }).catch(function(){
+    fail('鍵が正しくありません。');
+  });
+})();
+</script>
+</body>
+</html>
